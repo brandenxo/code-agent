@@ -6,7 +6,7 @@ from openai import OpenAI
 
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 BASE_URL = os.getenv("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
-MODEL = os.getenv("OPENROUTER_MODEL", default="anthropic/claude-haiku-4.5")
+MODEL = os.getenv("OPENROUTER_MODEL", default="openrouter/free")
 
 
 def run_turn(client, conversation_history):
