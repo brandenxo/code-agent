@@ -1,33 +1,213 @@
-# code-agent
+# Code Agent
 
-A small terminal AI coding assistant. It runs a chat loop against an
-OpenAI-compatible API (via [OpenRouter](https://openrouter.ai)) and gives the
-model a handful of tools — `Read`, `Write`, and `Bash` — so it can read files,
-write files, and run shell commands on your behalf.
+A lightweight coding agent built in Python that can interact with a local project through LLM tool calling.
+
+The agent maintains conversation history, decides when to use tools, executes those tools locally, and feeds the results back to the model until it produces a final response.
+
+It currently runs as an interactive terminal application and uses OpenRouter for model access.
+
+## Features
+
+- Interactive terminal chat
+- Persistent conversation history
+- Multi-step agent loop
+- LLM tool calling
+- Read local files
+- Create and overwrite files
+- Execute shell commands
+- Support multiple tool calls in a single model response
+- Configurable OpenRouter model through environment variables
+
+## How It Works
+
+The agent follows a loop:
+
+```text
+User prompt
+    ↓
+LLM receives conversation history + available tools
+    ↓
+LLM either:
+    ├── returns a final response
+    │
+    └── requests one or more tools
+            ↓
+        Python executes the tools
+            ↓
+        Tool results are added to conversation history
+            ↓
+        LLM is called again
+```
+
+The model does not directly read files or execute commands.
+
+Instead, it returns structured tool requests. The Python runtime performs the requested operation, stores the result in the conversation history, and sends the updated conversation back to the model.
+
+## Available Tools
+
+### Read
+
+Reads and returns the contents of a local file.
+
+Example:
+
+```text
+> read README.md and explain what this project does
+```
+
+### Write
+
+Creates or overwrites a file with generated content.
+
+Example:
+
+```text
+> create hello.txt and write "hello world" inside it
+```
+
+### Bash
+
+Executes a shell command and returns its output to the model.
+
+Example:
+
+```text
+> use bash to list the files in this directory
+```
+
+> **Warning:** Bash commands are currently executed directly through the local shell. Additional approval and execution controls are planned.
+
+## Project Structure
+
+```text
+app/
+├── main.py
+└── tools.py
+```
+
+### `main.py`
+
+Handles:
+
+- terminal input
+- conversation history
+- model requests
+- the agent loop
+- tool-call handling
+- final responses
+
+### `tools.py`
+
+Contains:
+
+- tool schemas sent to the model
+- Read implementation
+- Write implementation
+- Bash implementation
+
+## Tech Stack
+
+- Python
+- OpenAI Python SDK
+- OpenRouter API
+- JSON
+- subprocess
+- LLM tool calling
 
 ## Setup
 
-1. Install [uv](https://docs.astral.sh/uv/).
-2. Create an [OpenRouter](https://openrouter.ai) account and API key.
-3. Set the required environment variable:
+### Requirements
 
-   ```sh
-   export OPENROUTER_API_KEY="sk-or-..."
-   ```
+- Python 3.14+
+- OpenRouter account
+- OpenRouter API key
 
-## Run
+Install the project:
 
-```sh
-uv run -m app.main
+```bash
+pip install -e .
 ```
 
-This starts an interactive prompt. Type a message and press enter; the
-assistant will respond and, if needed, call its tools to read/write files or
-run commands in the current directory. Type `exit` or `quit` to end the
-session.
+## Environment Variables
 
-## Project layout
+The application reads configuration from environment variables.
 
-- `app/main.py` — the chat loop and REPL entry point.
-- `app/tools.py` — tool definitions (schemas for the model) and their
-  execution (`execute_tool`).
+### Windows PowerShell
+
+```powershell
+$env:OPENROUTER_API_KEY="your-api-key"
+```
+
+Optional model override:
+
+```powershell
+$env:OPENROUTER_MODEL="openrouter/free"
+```
+
+### macOS / Linux
+
+```bash
+export OPENROUTER_API_KEY="your-api-key"
+```
+
+Optional model override:
+
+```bash
+export OPENROUTER_MODEL="openrouter/free"
+```
+
+API keys should never be committed to source control.
+
+## Running the Agent
+
+From the project root:
+
+```bash
+python -m app.main
+```
+
+The program starts an interactive terminal session:
+
+```text
+> say hello
+Hello, how are you today?
+
+> read README.md and summarize it
+This project is a lightweight coding agent...
+
+> exit
+```
+
+Use either:
+
+```text
+exit
+```
+
+or:
+
+```text
+quit
+```
+
+to close the program.
+
+## Current Limitations
+
+- Bash commands execute without user approval
+- Shell execution is not sandboxed
+- Bash commands do not currently have execution time limits
+- Conversations are not persisted after the program exits
+- The interface is terminal-only
+- Long conversations are not yet summarized or truncated
+
+## Planned Improvements
+
+- Browser-based interface with FastAPI
+- WebSocket communication
+- Streaming model responses
+- Human approval before potentially destructive tool execution
+- Tool execution activity log
+- Safer shell execution
+- File change visualization
+- Model switching and comparison metrics
