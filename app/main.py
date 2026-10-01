@@ -16,21 +16,30 @@ MODEL = os.getenv(
 
 
 def run_turn(client, conversation_history):
+    total_tokens, tool_count = 0, 0
     while True:
         chat = client.chat.completions.create(
             model=MODEL,
             messages=conversation_history,
             tools=TOOLS,
         )
-
+        if chat.usage:
+            total_tokens += chat.usage.total_tokens
+    
         if not chat.choices:
             raise RuntimeError("No choices in response")
 
         message = chat.choices[0].message
+
         conversation_history.append(message)
 
         if not message.tool_calls:
-            return message.content or ""
+            return (
+                message.content or "",
+                chat.model,
+                total_tokens,
+                tool_count
+                )
 
         for tool_call in message.tool_calls:
             result = execute_tool(tool_call)
@@ -42,6 +51,7 @@ def run_turn(client, conversation_history):
                     "content": result,
                 }
             )
+            tool_count += 1
 
 
 def run_agent(prompt):
@@ -90,7 +100,7 @@ def main():
             }
         )
 
-        reply = run_turn(
+        reply, model, tokens = run_turn(
             client,
             conversation_history,
         )
