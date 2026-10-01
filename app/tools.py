@@ -69,6 +69,7 @@ def execute_tool(tool_call):
 
         with open(file_path, "r") as file:
             return file.read()
+        
     elif tool_call.function.name == "Write":
         file_path = arguments["file_path"]
         content = arguments["content"]
@@ -76,9 +77,21 @@ def execute_tool(tool_call):
         with open(file_path, "w") as file:
             file.write(content)
         return "File written successfully."
+    
     elif tool_call.function.name == "Bash":
         command = arguments["command"]
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
-        return result.stdout
+
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+
+        return (
+            f"Exit code: {result.returncode}\n"
+            f"STDOUT:\n{result.stdout}\n"
+            f"STDERR:\n{result.stderr}"
+        )
     else:
         raise RuntimeError(f"Unsupported tool: {tool_call.function.name}")
