@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Code Agent</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app">
+
+        <header class="topbar">
+            <div>
+                <h1>Code Agent</h1>
+                <p>AI coding assistant</p>
+            </div>
+
+            <div class="model-box">
+                <span>Model</span>
+                <strong>Auto</strong>
+            </div>
+        </header>
+
+
+        <main class="chat">
+
+            <div id="messages" class="messages">
+
+                <div class="message agent-message">
+                    <div class="label">Code Agent</div>
+                    <div class="bubble">
+                        What would you like me to build, debug, or explain?
+                    </div>
+                </div>
+
+            </div>
+
+
+            <div class="input-area">
+
+                <textarea
+                    id="promptInput"
+                    placeholder="Ask Code Agent..."
+                ></textarea>
+
+                <button id="sendButton">
+                    Send
+                </button>
+
+            </div>
+
+        </main>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
