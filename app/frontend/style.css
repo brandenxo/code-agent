@@ -5,33 +5,108 @@
 }
 
 body {
-    font-family: Arial, sans-serif;
-
+    height: 100vh;
+    overflow: hidden;
     background: #0d1117;
     color: #f0f0f0;
+    font-family: Arial, sans-serif;
+}
 
+.layout {
+    display: flex;
+    width: 100%;
     height: 100vh;
 }
 
+.sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    padding: 20px 14px;
+    background: #0a0d12;
+    border-right: 1px solid #2a2f36;
+}
+
+.sidebar-header h2 {
+    margin: 0 8px 18px;
+    font-size: 20px;
+}
+
+#newChatButton {
+    width: 100%;
+    padding: 11px 14px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    color: #f0f0f0;
+    cursor: pointer;
+    font-weight: bold;
+    text-align: left;
+}
+
+#newChatButton:hover {
+    background: #21262d;
+}
+
+.sidebar-section {
+    margin-top: 28px;
+}
+
+.sidebar-label {
+    margin: 0 10px 8px;
+    color: #8b949e;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+#chatList {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.chat-item {
+    width: 100%;
+    overflow: hidden;
+    padding: 10px 12px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: #c9d1d9;
+    cursor: pointer;
+    font-weight: normal;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-item:hover {
+    background: #161b22;
+}
+
+.chat-item.active {
+    background: #21262d;
+    border-color: #30363d;
+    color: #ffffff;
+}
+
 .app {
-    max-width: 1000px;
+    min-width: 0;
     height: 100vh;
-
-    margin: auto;
-
+    flex: 1;
     display: flex;
     flex-direction: column;
 }
 
 .topbar {
     height: 80px;
-
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
-
     padding: 0 25px;
-
     border-bottom: 1px solid #2a2f36;
 }
 
@@ -41,23 +116,17 @@ body {
 
 .topbar p {
     margin-top: 4px;
-
     color: #8b949e;
-
     font-size: 13px;
 }
 
 .model-box {
     display: flex;
     gap: 8px;
-
     padding: 8px 12px;
-
     background: #161b22;
-
     border: 1px solid #30363d;
     border-radius: 8px;
-
     font-size: 13px;
 }
 
@@ -66,19 +135,15 @@ body {
 }
 
 .chat {
+    min-height: 0;
     flex: 1;
-
     display: flex;
     flex-direction: column;
-
-    min-height: 0;
 }
 
 .messages {
     flex: 1;
-
     overflow-y: auto;
-
     padding: 30px 25px;
 }
 
@@ -88,25 +153,19 @@ body {
 
 .label {
     margin-bottom: 6px;
-
     color: #8b949e;
-
     font-size: 12px;
 }
 
 .bubble {
     display: inline-block;
-
     max-width: 75%;
-
     padding: 14px 16px;
-
     background: #161b22;
-
     border: 1px solid #30363d;
     border-radius: 10px;
-
     line-height: 1.5;
+    text-align: left;
 }
 
 .user-message {
@@ -119,36 +178,26 @@ body {
 
 .stats {
     margin-top: 8px;
-
     color: #8b949e;
-
     font-size: 12px;
 }
 
 .input-area {
     display: flex;
     gap: 10px;
-
     padding: 20px 25px;
-
     border-top: 1px solid #2a2f36;
 }
 
 textarea {
-    flex: 1;
-
     height: 60px;
-
+    flex: 1;
     resize: none;
-
     padding: 14px;
-
     background: #161b22;
-    color: #f0f0f0;
-
     border: 1px solid #30363d;
     border-radius: 8px;
-
+    color: #f0f0f0;
     outline: none;
 }
 
@@ -156,20 +205,72 @@ textarea:focus {
     border-color: #5865f2;
 }
 
-button {
+#sendButton {
     width: 90px;
-
+    background: #5865f2;
     border: none;
     border-radius: 8px;
-
-    background: #5865f2;
     color: white;
-
     cursor: pointer;
-
     font-weight: bold;
 }
 
-button:hover {
+#sendButton:hover {
     background: #4752c4;
+}
+
+.bubble h1,
+.bubble h2,
+.bubble h3 {
+    margin-top: 14px;
+    margin-bottom: 8px;
+}
+
+.bubble p {
+    margin-bottom: 10px;
+}
+
+.bubble p:last-child {
+    margin-bottom: 0;
+}
+
+.bubble ul,
+.bubble ol {
+    margin-left: 20px;
+    margin-bottom: 10px;
+}
+
+.bubble code {
+    padding: 2px 5px;
+    background: #0d1117;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+.bubble pre {
+    overflow-x: auto;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    padding: 12px;
+    background: #0d1117;
+    border-radius: 8px;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+textarea:disabled {
+    opacity: 0.7;
+}
+
+@media (max-width: 700px) {
+    .sidebar {
+        width: 220px;
+    }
+
+    .bubble {
+        max-width: 90%;
+    }
 }

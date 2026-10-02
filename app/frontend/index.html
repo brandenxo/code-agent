@@ -3,59 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Code Agent</title>
-
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Code Agent</h2>
 
-    <div class="app">
-
-        <header class="topbar">
-            <div>
-                <h1>Code Agent</h1>
-                <p>AI coding assistant</p>
+                <button id="newChatButton" type="button">
+                    + New Chat
+                </button>
             </div>
 
-            <div class="model-box">
-                <span>Model</span>
-                <strong>Auto</strong>
+            <div class="sidebar-section">
+                <p class="sidebar-label">Recent</p>
+                <div id="chatList"></div>
             </div>
-        </header>
+        </aside>
 
-
-        <main class="chat">
-
-            <div id="messages" class="messages">
-
-                <div class="message agent-message">
-                    <div class="label">Code Agent</div>
-                    <div class="bubble">
-                        What would you like me to build, debug, or explain?
-                    </div>
+        <div class="app">
+            <header class="topbar">
+                <div>
+                    <h1>Code Agent</h1>
+                    <p>AI coding assistant</p>
                 </div>
 
-            </div>
+                <div class="model-box">
+                    <span>Model</span>
+                    <strong>Auto</strong>
+                </div>
+            </header>
 
+            <main class="chat">
+                <div id="messages" class="messages"></div>
 
-            <div class="input-area">
+                <div class="input-area">
+                    <textarea
+                        id="promptInput"
+                        placeholder="Ask Code Agent..."
+                    ></textarea>
 
-                <textarea
-                    id="promptInput"
-                    placeholder="Ask Code Agent..."
-                ></textarea>
-
-                <button id="sendButton">
-                    Send
-                </button>
-
-            </div>
-
-        </main>
-
+                    <button id="sendButton" type="button">
+                        Send
+                    </button>
+                </div>
+            </main>
+        </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
