@@ -3,6 +3,7 @@ const sendButton = document.getElementById("sendButton");
 const messages = document.getElementById("messages");
 const newChatButton = document.getElementById("newChatButton");
 const chatList = document.getElementById("chatList");
+const modelSelect = document.getElementById("modelSelect");
 
 let currentChatId = null;
 let chats = {};
@@ -63,7 +64,8 @@ async function sendMessage() {
             },
             body: JSON.stringify({
                 chat_id: requestChatId,
-                prompt: prompt
+                prompt: prompt,
+                model: modelSelect.value
             })
         });
 

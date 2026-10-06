@@ -134,6 +134,14 @@ body {
     color: #8b949e;
 }
 
+#modelSelect {
+    background: #161b22;
+    border: none;
+    color: #f0f0f0;
+    cursor: pointer;
+    outline: none;
+}
+
 .chat {
     min-height: 0;
     flex: 1;
