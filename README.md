@@ -1,213 +1,140 @@
 # Code Agent
 
-A lightweight coding agent built in Python that can interact with a local project through LLM tool calling.
-
-The agent maintains conversation history, decides when to use tools, executes those tools locally, and feeds the results back to the model until it produces a final response.
-
-It currently runs as an interactive terminal application and uses OpenRouter for model access.
+Code Agent is a small, readable coding assistant built with Python, FastAPI,
+SQLite, and a vanilla HTML/CSS/JavaScript interface. It sends model requests
+through OpenRouter, supports multi-step tool use, and keeps browser
+conversations across restarts.
 
 ## Features
 
-- Interactive terminal chat
-- Persistent conversation history
-- Multi-step agent loop
-- LLM tool calling
-- Read local files
-- Create and overwrite files
-- Execute shell commands
-- Support multiple tool calls in a single model response
-- Configurable OpenRouter model through environment variables
+- Browser chat UI and interactive CLI
+- Manual model selection or benchmark-informed automatic routing
+- SQLite conversation and message persistence
+- Read, Write, and direct subprocess-based Bash tools
+- Tool-call and runtime safety limits
+- Local benchmark harness with resumable JSON results
+- Internal metrics for correctness, latency, tokens, and tool calls
+- Separate storage for sourced public benchmark data
 
-## How It Works
+## Supported models
 
-The agent follows a loop:
+- NVIDIA Nemotron 3 Ultra (`nvidia/nemotron-3-ultra-550b-a55b:free`)
+- Poolside Laguna S 2.1 (`poolside/laguna-s-2.1:free`)
+- Cohere North Mini Code (`cohere/north-mini-code:free`)
 
-```text
-User prompt
-    ↓
-LLM receives conversation history + available tools
-    ↓
-LLM either:
-    ├── returns a final response
-    │
-    └── requests one or more tools
-            ↓
-        Python executes the tools
-            ↓
-        Tool results are added to conversation history
-            ↓
-        LLM is called again
+These are currently OpenRouter free-tier model IDs. Availability and provider
+limits are controlled by OpenRouter.
+
+## Automatic routing
+
+The browser's **Auto** option sends `auto` to this application, never to
+OpenRouter. `app/router.py` classifies the prompt as code understanding,
+debugging, feature implementation, refactoring, testing, or multi-step tool
+use. It then compares active models using data in SQLite.
+
+Internal benchmark evidence emphasizes correctness (60%), followed by latency
+efficiency (15%), token efficiency (15%), and tool efficiency (10%). Public
+benchmark scores are normalized within each benchmark before being used as a
+supplemental prior. Internal evidence can carry up to 70% of the combined
+decision; sparse internal evidence gives public data more influence. With no
+usable data, the router uses explicit category-based fallbacks.
+
+`internal_benchmarks` contains only measurements produced by this project's
+benchmark harness. `external_benchmarks` is reserved for sourced published
+results. No public scores are bundled. Add verified records to
+`app/seed_benchmarks.py`, including source metadata, then run it idempotently:
+
+```powershell
+python -m app.seed_benchmarks
 ```
 
-The model does not directly read files or execute commands.
-
-Instead, it returns structured tool requests. The Python runtime performs the requested operation, stores the result in the conversation history, and sends the updated conversation back to the model.
-
-## Available Tools
-
-### Read
-
-Reads and returns the contents of a local file.
-
-Example:
-
-```text
-> read README.md and explain what this project does
-```
-
-### Write
-
-Creates or overwrites a file with generated content.
-
-Example:
-
-```text
-> create hello.txt and write "hello world" inside it
-```
-
-### Bash
-
-Executes a shell command and returns its output to the model.
-
-Example:
-
-```text
-> use bash to list the files in this directory
-```
-
-> **Warning:** Bash commands are currently executed directly through the local shell. Additional approval and execution controls are planned.
-
-## Project Structure
+## Project structure
 
 ```text
 app/
-├── main.py
-└── tools.py
+  api.py                 FastAPI routes and frontend hosting
+  benchmark.py           Local benchmark runner and result persistence
+  database.py            SQLite schema and data helpers
+  main.py                Agent loop, CLI, and execution limits
+  router.py              Prompt classifier and model scoring
+  seed_benchmarks.py     Verified public benchmark import list
+  tools.py               Read, Write, and Bash implementations
+  frontend/              Browser UI
+benchmarks/fixtures/     Local benchmark tasks
+tests/                   Free, local unit tests
 ```
-
-### `main.py`
-
-Handles:
-
-- terminal input
-- conversation history
-- model requests
-- the agent loop
-- tool-call handling
-- final responses
-
-### `tools.py`
-
-Contains:
-
-- tool schemas sent to the model
-- Read implementation
-- Write implementation
-- Bash implementation
-
-## Tech Stack
-
-- Python
-- OpenAI Python SDK
-- OpenRouter API
-- JSON
-- subprocess
-- LLM tool calling
 
 ## Setup
 
-### Requirements
+Requirements: Python 3.14+ and an OpenRouter account for model calls.
 
-- Python 3.14+
-- OpenRouter account
-- OpenRouter API key
+Using uv:
 
-Install the project:
-
-```bash
-pip install -e .
+```powershell
+uv sync
 ```
 
-## Environment Variables
+Or using pip:
 
-The application reads configuration from environment variables.
+```powershell
+python -m pip install -e .
+```
 
-### Windows PowerShell
+Set the API key before making chat or benchmark requests:
 
 ```powershell
 $env:OPENROUTER_API_KEY="your-api-key"
 ```
 
-Optional model override:
+On macOS or Linux, use `export OPENROUTER_API_KEY="your-api-key"`.
+
+## Run
+
+Start the API and its browser UI from the project root:
 
 ```powershell
-$env:OPENROUTER_MODEL="openrouter/free"
+python -m uvicorn app.api:app --reload
 ```
 
-### macOS / Linux
+Then open <http://localhost:8000>. The frontend is served by FastAPI, so a
+separate web server is not required.
 
-```bash
-export OPENROUTER_API_KEY="your-api-key"
-```
+The CLI remains available:
 
-Optional model override:
-
-```bash
-export OPENROUTER_MODEL="openrouter/free"
-```
-
-API keys should never be committed to source control.
-
-## Running the Agent
-
-From the project root:
-
-```bash
+```powershell
 python -m app.main
 ```
 
-The program starts an interactive terminal session:
+`OPENROUTER_MODEL` optionally changes the CLI model. Browser model selection is
+controlled by the dropdown and Auto router.
 
-```text
-> say hello
-Hello, how are you today?
+## Tests and benchmarks
 
-> read README.md and summarize it
-This project is a lightweight coding agent...
+Run all local unit tests without contacting OpenRouter:
 
-> exit
+```powershell
+python -m pytest -q
 ```
 
-Use either:
+The benchmark suite makes live model requests and may be rate-limited. Run it
+only when you intentionally want those requests:
 
-```text
-exit
+```powershell
+python -m app.benchmark
 ```
 
-or:
+Completed benchmark results are retained and skipped on later runs. Targeted
+reruns use `--rerun=task-id:model-label`; see `app/benchmark.py` for labels.
 
-```text
-quit
-```
+## Current limitations
 
-to close the program.
-
-## Current Limitations
-
-- Bash commands execute without user approval
-- Shell execution is not sandboxed
-- Bash commands do not currently have execution time limits
-- Conversations are not persisted after the program exits
-- The interface is terminal-only
-- Long conversations are not yet summarized or truncated
-
-## Planned Improvements
-
-- Browser-based interface with FastAPI
-- WebSocket communication
-- Streaming model responses
-- Human approval before potentially destructive tool execution
-- Tool execution activity log
-- Safer shell execution
-- File change visualization
-- Model switching and comparison metrics
+- Tool use has no human approval step, and Read/Write are not sandboxed during
+  normal chat. Benchmark workspaces remain path-restricted.
+- Bash starts one executable directly; shell pipelines, redirection, and other
+  shell syntax are not interpreted.
+- Responses do not stream, and long conversations are not summarized.
+- There is no authentication, multi-user isolation, or deletion UI.
+- Historical messages retain content and model ID, but not per-response latency,
+  token counts, or Auto-routing explanations.
+- External benchmark data must be verified and entered manually; no scraping is
+  performed.

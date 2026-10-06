@@ -6,6 +6,9 @@ import shlex
 import subprocess
 import sys
 
+
+BASH_TIMEOUT_SECONDS = 60
+
 TOOLS = [
     {
         "type": "function",
@@ -102,18 +105,28 @@ def _run_benchmark_command(command, workspace_root):
     arguments = shlex.split(command, posix=os.name != "nt")
     arguments[0] = sys.executable
 
-    result = subprocess.run(
-        arguments,
-        cwd=workspace_root,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
+    try:
+        result = subprocess.run(
+            arguments,
+            cwd=workspace_root,
+            capture_output=True,
+            text=True,
+            timeout=BASH_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return _timeout_result()
 
     return (
         f"Exit code: {result.returncode}\n"
         f"STDOUT:\n{result.stdout}\n"
         f"STDERR:\n{result.stderr}"
+    )
+
+
+def _timeout_result():
+    return (
+        "Exit code: 124\nSTDOUT:\n\nSTDERR:\n"
+        f"Command timed out after {BASH_TIMEOUT_SECONDS} seconds."
     )
 
 
@@ -141,12 +154,19 @@ def execute_tool(tool_call, workspace_root=None):
         if workspace_root is not None:
             return _run_benchmark_command(command, workspace_root)
 
-        result = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
+        arguments = shlex.split(command, posix=os.name != "nt")
+        if not arguments:
+            raise ValueError("Bash command cannot be empty")
+
+        try:
+            result = subprocess.run(
+                arguments,
+                capture_output=True,
+                text=True,
+                timeout=BASH_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            return _timeout_result()
 
         return (
             f"Exit code: {result.returncode}\n"

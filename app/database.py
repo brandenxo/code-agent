@@ -218,6 +218,64 @@ def add_external_benchmark(
         connection.close()
 
 
+def seed_external_benchmarks(records):
+    """Insert published benchmark records without duplicating existing rows.
+
+    Each record must contain a real, sourced value. This helper deliberately
+    ships without benchmark numbers; callers provide records they have verified.
+    """
+    inserted = 0
+    connection = get_connection()
+    try:
+        for record in records:
+            required = {"model_id", "benchmark_name", "score", "source"}
+            missing = required.difference(record)
+            if missing:
+                raise ValueError(
+                    f"External benchmark record is missing: {', '.join(sorted(missing))}"
+                )
+
+            published_date = record.get("published_date")
+            existing = connection.execute(
+                """
+                SELECT 1 FROM external_benchmarks
+                WHERE model_id = ? AND benchmark_name = ? AND source = ?
+                  AND published_date IS ?
+                """,
+                (
+                    record["model_id"],
+                    record["benchmark_name"],
+                    record["source"],
+                    published_date,
+                ),
+            ).fetchone()
+            if existing:
+                continue
+
+            connection.execute(
+                """
+                INSERT INTO external_benchmarks (
+                    model_id, benchmark_name, score, source, source_url,
+                    published_date, fetched_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record["model_id"],
+                    record["benchmark_name"],
+                    record["score"],
+                    record["source"],
+                    record.get("source_url"),
+                    published_date,
+                    record.get("fetched_at") or current_time(),
+                ),
+            )
+            inserted += 1
+        connection.commit()
+        return inserted
+    finally:
+        connection.close()
+
+
 def get_external_benchmarks(model_id=None, benchmark_name=None):
     connection = get_connection()
     try:
@@ -268,6 +326,23 @@ def get_conversations():
         return connection.execute(
             "SELECT * FROM conversations ORDER BY updated_at DESC"
         ).fetchall()
+    finally:
+        connection.close()
+
+
+def update_conversation_title(conversation_id, title):
+    connection = get_connection()
+    try:
+        cursor = connection.execute(
+            """
+            UPDATE conversations
+            SET title = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (title, current_time(), conversation_id),
+        )
+        connection.commit()
+        return cursor.rowcount > 0
     finally:
         connection.close()
 

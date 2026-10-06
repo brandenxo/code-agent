@@ -190,6 +190,15 @@ body {
     font-size: 12px;
 }
 
+.routing-details {
+    max-width: 75%;
+    margin-top: 6px;
+    color: #aeb8c4;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-line;
+}
+
 .input-area {
     display: flex;
     gap: 10px;

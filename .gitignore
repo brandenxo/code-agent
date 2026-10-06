@@ -176,3 +176,10 @@ cython_debug/
 
 # Local scratch/test output
 sandbox_test/
+app/results.json
+
+# Local application database
+code-agent.db
+code-agent.db-journal
+code-agent.db-shm
+code-agent.db-wal

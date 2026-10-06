@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import time
 
 from app.tools import TOOLS, execute_tool
 from openai import OpenAI
@@ -15,11 +16,39 @@ MODEL = os.getenv(
     default="openrouter/free",
 )
 
+DEFAULT_MAX_TOOL_CALLS = 12
+DEFAULT_MAX_RUNTIME_SECONDS = 120
+DEFAULT_MAX_TOTAL_TOKENS = None
 
-def run_turn(client, conversation_history, model, workspace_root=None):
+
+def _limit_result(conversation_history, message, model, tokens, tool_count, steps):
+    conversation_history.append({"role": "assistant", "content": message})
+    return message, model, tokens, tool_count, steps
+
+
+def run_turn(
+    client,
+    conversation_history,
+    model,
+    workspace_root=None,
+    max_tool_calls=DEFAULT_MAX_TOOL_CALLS,
+    max_runtime_seconds=DEFAULT_MAX_RUNTIME_SECONDS,
+    max_total_tokens=DEFAULT_MAX_TOTAL_TOKENS,
+):
     total_tokens, tool_count = 0, 0
     steps = []
+    started = time.perf_counter()
     while True:
+        if time.perf_counter() - started >= max_runtime_seconds:
+            return _limit_result(
+                conversation_history,
+                "Agent stopped safely after reaching the runtime limit.",
+                model,
+                total_tokens,
+                tool_count,
+                steps,
+            )
+
         chat = client.chat.completions.create(
             model=model,
             messages=conversation_history,
@@ -32,13 +61,39 @@ def run_turn(client, conversation_history, model, workspace_root=None):
             raise RuntimeError("No choices in response")
 
         message = chat.choices[0].message
+        actual_model = chat.model or model
+
+        if (
+            max_total_tokens is not None
+            and total_tokens >= max_total_tokens
+            and message.tool_calls
+        ):
+            return _limit_result(
+                conversation_history,
+                "Agent stopped safely after reaching the token limit.",
+                actual_model,
+                total_tokens,
+                tool_count,
+                steps,
+            )
+
+        pending_tool_calls = len(message.tool_calls or [])
+        if message.tool_calls and tool_count + pending_tool_calls > max_tool_calls:
+            return _limit_result(
+                conversation_history,
+                "Agent stopped safely after reaching the tool-call limit.",
+                actual_model,
+                total_tokens,
+                tool_count,
+                steps,
+            )
 
         conversation_history.append(message)
 
         if not message.tool_calls:
             return (
                 message.content or "",
-                chat.model,
+                actual_model,
                 total_tokens,
                 tool_count,
                 steps,
