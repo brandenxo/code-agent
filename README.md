@@ -41,12 +41,21 @@ usable data, the router uses explicit category-based fallbacks.
 
 `internal_benchmarks` contains only measurements produced by this project's
 benchmark harness. `external_benchmarks` is reserved for sourced published
-results. No public scores are bundled. Add verified records to
-`app/seed_benchmarks.py`, including source metadata, then run it idempotently:
+results. Verified vendor-published scores and their source metadata are bundled
+in `app/seed_benchmarks.py`. Seed them idempotently with:
 
 ```powershell
 python -m app.seed_benchmarks
 ```
+
+Import the benchmark harness's existing local results into SQLite with:
+
+```powershell
+python -m app.import_internal_results
+```
+
+The import is idempotent: unchanged model/task results are not duplicated, and
+rerun results update their existing row.
 
 ## Project structure
 
@@ -98,6 +107,11 @@ python -m uvicorn app.api:app --reload
 
 Then open <http://localhost:8000>. The frontend is served by FastAPI, so a
 separate web server is not required.
+
+Choose **Benchmarks** or open <http://localhost:8000/#benchmarks> to compare
+internal model metrics, published external results, and current Auto picks.
+The dashboard reads `GET /benchmarks/summary`; opening or refreshing it makes
+no model requests and does not run benchmarks.
 
 The CLI remains available:
 

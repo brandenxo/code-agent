@@ -18,6 +18,11 @@ MODEL_NAMES = {
     "cohere/north-mini-code:free": "North Mini Code",
 }
 
+TASK_CATEGORIES = (
+    "code_understanding", "debugging", "feature_implementation",
+    "refactoring", "testing", "multi_step_tool_use",
+)
+
 # Ordered from most specific to most general.
 CATEGORY_PHRASES = (
     (
@@ -149,6 +154,14 @@ def _fallback(category):
 def select_model(prompt):
     """Return ``(model_id, task_category, routing_reason)`` for a prompt."""
     category = classify_task(prompt)
+    selection = select_model_for_category(category)
+    return selection["selected_model"], category, selection["reason"]
+
+
+def select_model_for_category(category):
+    """Use the same routing decision for chat and the comparison dashboard."""
+    if category not in TASK_CATEGORIES:
+        raise ValueError(f"Unknown task category: {category}")
     try:
         active_models = {
             row["model_id"] for row in database.get_models(active_only=True)
@@ -160,12 +173,12 @@ def select_model(prompt):
         external_rows = database.get_external_benchmarks()
     except Exception:
         # Routing must remain available during first-run database setup failures.
-        return _fallback(category)
+        return _fallback_selection(category)
 
     internal = _internal_scores(internal_rows, model_ids)
     external = _external_scores(external_rows, model_ids)
     if not internal and not external:
-        return _fallback(category)
+        return _fallback_selection(category)
 
     evidence_target = max(1, len(model_ids) * 3)
     internal_confidence = min(1.0, len(internal_rows) / evidence_target)
@@ -195,4 +208,19 @@ def select_model(prompt):
         f"{MODEL_NAMES[selected]} had the strongest normalized score for "
         f"{category} using {' and '.join(sources)} benchmark evidence."
     )
-    return selected, category, reason
+    return {
+        "selected_model": selected,
+        "display_name": MODEL_NAMES[selected],
+        "reason": reason,
+        "evidence_type": "benchmark",
+    }
+
+
+def _fallback_selection(category):
+    selected, _, reason = _fallback(category)
+    return {
+        "selected_model": selected,
+        "display_name": MODEL_NAMES[selected],
+        "reason": reason,
+        "evidence_type": "fallback",
+    }

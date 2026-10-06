@@ -10,7 +10,7 @@ from pathlib import Path
 
 from openai import OpenAI
 
-from app.database import add_internal_benchmark, initialize_database
+from app.database import initialize_database, upsert_internal_benchmark
 from app.main import API_KEY, BASE_URL, run_turn
 
 
@@ -151,12 +151,12 @@ def load_results():
 
 
 def copy_result_to_database(result):
-    """Copy one completed JSON benchmark result into SQLite."""
+    """Idempotently copy one completed JSON benchmark result into SQLite."""
     if not result.get("actual_model"):
         raise ValueError("Only completed benchmark results can be copied")
 
     initialize_database()
-    return add_internal_benchmark(
+    row_id, _ = upsert_internal_benchmark(
         model_id=result["actual_model"],
         task_id=result["task_id"],
         category=result["category"],
@@ -165,6 +165,7 @@ def copy_result_to_database(result):
         tokens=result.get("tokens"),
         tool_calls=result.get("tool_calls"),
     )
+    return row_id
 
 
 def result_key(result):

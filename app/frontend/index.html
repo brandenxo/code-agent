@@ -30,7 +30,12 @@
                     <p>AI coding assistant</p>
                 </div>
 
-                <div class="model-box">
+                <nav class="view-nav" aria-label="Main navigation">
+                    <button id="chatTab" type="button" aria-pressed="true">Chat</button>
+                    <button id="benchmarksTab" type="button" aria-pressed="false">Benchmarks</button>
+                </nav>
+
+                <div class="model-box" id="modelBox">
                     <span>Model</span>
                     <select id="modelSelect">
                         <option value="auto">Auto</option>
@@ -47,7 +52,7 @@
                 </div>
             </header>
 
-            <main class="chat">
+            <main class="chat" id="chatView">
                 <div id="messages" class="messages"></div>
 
                 <div class="input-area">
@@ -60,6 +65,14 @@
                         Send
                     </button>
                 </div>
+            </main>
+            <main id="benchmarksView" class="benchmarks-view" hidden>
+                <div class="benchmark-heading">
+                    <div><h2>Model comparison</h2><p>Internal measurements and current Auto preferences</p></div>
+                    <button id="refreshBenchmarks" type="button">Refresh</button>
+                </div>
+                <p id="benchmarkStatus" role="status" aria-live="polite"></p>
+                <div id="benchmarkContent"></div>
             </main>
         </div>
     </div>

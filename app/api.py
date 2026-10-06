@@ -13,11 +13,15 @@ from app.database import (
     get_conversation,
     get_conversations,
     get_messages,
+    get_models,
+    get_internal_benchmarks,
+    get_external_benchmarks,
+    summarize_internal_benchmarks,
     initialize_database,
     update_conversation_title,
 )
 from app.main import API_KEY, BASE_URL, run_turn
-from app.router import select_model
+from app.router import TASK_CATEGORIES, select_model, select_model_for_category
 
 app = FastAPI()
 
@@ -114,6 +118,40 @@ def chat(request: ChatRequest):
         "routing_reason": routing_reason,
         "requested_model": requested_model,
         "selected_model": selected_model,
+    }
+
+
+@app.get("/benchmarks/summary")
+def benchmark_summary():
+    internal_rows = get_internal_benchmarks()
+    external_rows = get_external_benchmarks()
+    models = []
+    for model in get_models(active_only=True):
+        rows = [row for row in internal_rows if row["model_id"] == model["model_id"]]
+        models.append({
+            "model_id": model["model_id"],
+            "display_name": model["name"],
+            "provider": model["provider"],
+            "internal": summarize_internal_benchmarks(rows),
+            "categories": {
+                category: summarize_internal_benchmarks(
+                    [row for row in rows if row["category"] == category]
+                )
+                for category in TASK_CATEGORIES
+            },
+            "external": [
+                {key: row[key] for key in (
+                    "benchmark_name", "score", "source", "source_url", "published_date"
+                )}
+                for row in external_rows if row["model_id"] == model["model_id"]
+            ],
+        })
+    return {
+        "models": models,
+        "routing": {
+            category: select_model_for_category(category)
+            for category in TASK_CATEGORIES
+        },
     }
 
 

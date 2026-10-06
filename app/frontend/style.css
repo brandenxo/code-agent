@@ -4,6 +4,8 @@
     padding: 0;
 }
 
+[hidden] { display: none !important; }
+
 body {
     height: 100vh;
     overflow: hidden;
@@ -290,4 +292,69 @@ textarea:disabled {
     .bubble {
         max-width: 90%;
     }
+}
+
+.view-nav { display: flex; gap: 6px; }
+.view-nav button, #refreshBenchmarks {
+    padding: 9px 14px;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    background: #161b22;
+    color: #c9d1d9;
+    cursor: pointer;
+}
+.view-nav button[aria-pressed="true"] {
+    background: #27294d;
+    border-color: #5865f2;
+    color: #fff;
+}
+button:focus-visible, .table-scroll:focus-visible, a:focus-visible {
+    outline: 2px solid #8b94ff;
+    outline-offset: 3px;
+}
+.benchmarks-view { flex: 1; min-height: 0; overflow-y: auto; padding: 28px 25px; }
+.benchmark-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.benchmark-heading p, .section-description, .provider {
+    color: #8b949e; font-size: 13px; margin-top: 6px; line-height: 1.5;
+}
+#benchmarkStatus { margin-top: 14px; color: #aeb8c4; }
+.model-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-top: 18px; }
+.model-card { padding: 20px; border: 1px solid #30363d; border-radius: 10px; background: #161b22; }
+.model-card h3 { font-size: 17px; }
+.model-card dl { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 18px; font-size: 13px; }
+.model-card dt { color: #8b949e; }
+.model-card dd { font-variant-numeric: tabular-nums; }
+.benchmark-section { margin-top: 30px; }
+.benchmark-section h3 { font-size: 17px; }
+.table-scroll { overflow-x: auto; margin-top: 14px; border: 1px solid #30363d; border-radius: 10px; }
+.benchmark-section table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+.benchmark-section th, .benchmark-section td { padding: 14px; border-bottom: 1px solid #2a2f36; vertical-align: top; line-height: 1.5; }
+.benchmark-section thead { background: #161b22; color: #aeb8c4; }
+.benchmark-section tbody th { font-weight: normal; min-width: 150px; }
+.benchmark-section tr:last-child td, .benchmark-section tr:last-child th { border-bottom: none; }
+.benchmark-section td { min-width: 140px; }
+.benchmark-section td strong { font-weight: normal; white-space: nowrap; }
+.cell-secondary { display: block; color: #8b949e; font-size: 12px; white-space: nowrap; margin-top: 4px; }
+.routing-badge { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 20px; background: #252a46; color: #b8bfff; font-size: 11px; white-space: nowrap; }
+.routing-badge.fallback { background: #30291d; color: #d9be85; }
+.benchmark-section a { color: #aab2ff; text-decoration: none; }
+.benchmark-section a:hover { text-decoration: underline; }
+.benchmark-section details { margin-top: 8px; color: #8b949e; font-size: 12px; }
+.benchmark-section summary { cursor: pointer; }
+.benchmark-section details p { margin-top: 6px; }
+@media (max-width: 900px) {
+    .topbar { height: auto; min-height: 80px; flex-wrap: wrap; gap: 12px; padding: 16px; }
+}
+@media (max-width: 600px) {
+    .benchmarks-view { padding: 20px 14px; }
+    .sidebar { width: 145px; padding: 14px 8px; }
+    .sidebar-header h2 { font-size: 16px; }
+    .topbar h1 { font-size: 18px; }
+    .messages { padding: 20px 12px; }
+    .input-area { padding: 12px; gap: 6px; }
+    textarea { min-width: 0; }
+    #sendButton { width: 60px; }
+    .model-box { max-width: 100%; }
+    #modelSelect { min-width: 0; }
+    .routing-details { max-width: 100%; }
 }

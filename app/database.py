@@ -1,4 +1,5 @@
 import sqlite3
+from statistics import mean
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -166,6 +167,77 @@ def add_internal_benchmark(
         connection.close()
 
 
+def upsert_internal_benchmark(
+    model_id,
+    task_id,
+    category,
+    success,
+    latency=None,
+    tokens=None,
+    tool_calls=None,
+    run_date=None,
+):
+    """Insert or update one internally measured model/task result."""
+    values = (
+        category,
+        int(success),
+        latency,
+        tokens,
+        tool_calls,
+    )
+    connection = get_connection()
+    try:
+        existing = connection.execute(
+            """
+            SELECT * FROM internal_benchmarks
+            WHERE model_id = ? AND task_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (model_id, task_id),
+        ).fetchone()
+
+        if existing is None:
+            cursor = connection.execute(
+                """
+                INSERT INTO internal_benchmarks (
+                    model_id, task_id, category, success, latency,
+                    tokens, tool_calls, run_date
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    model_id,
+                    task_id,
+                    *values,
+                    run_date or current_time(),
+                ),
+            )
+            connection.commit()
+            return cursor.lastrowid, "inserted"
+
+        existing_values = tuple(
+            existing[column]
+            for column in ("category", "success", "latency", "tokens", "tool_calls")
+        )
+        same_run_date = run_date is None or run_date == existing["run_date"]
+        if values == existing_values and same_run_date:
+            return existing["id"], "unchanged"
+
+        connection.execute(
+            """
+            UPDATE internal_benchmarks
+            SET category = ?, success = ?, latency = ?, tokens = ?,
+                tool_calls = ?, run_date = ?
+            WHERE id = ?
+            """,
+            (*values, run_date or current_time(), existing["id"]),
+        )
+        connection.commit()
+        return existing["id"], "updated"
+    finally:
+        connection.close()
+
+
 def get_internal_benchmarks(model_id=None, category=None):
     connection = get_connection()
     try:
@@ -291,6 +363,18 @@ def get_external_benchmarks(model_id=None, benchmark_name=None):
         return connection.execute(sql, parameters).fetchall()
     finally:
         connection.close()
+
+
+def summarize_internal_benchmarks(rows):
+    """Success rates are fractions; missing averages are null, not zero."""
+    summary = {
+        "runs": len(rows),
+        "success_rate": mean(row["success"] for row in rows) if rows else None,
+    }
+    for metric in ("latency", "tokens", "tool_calls"):
+        values = [row[metric] for row in rows if row[metric] is not None]
+        summary[f"avg_{metric}"] = mean(values) if values else None
+    return summary
 
 
 def create_conversation(conversation_id, title=None):
