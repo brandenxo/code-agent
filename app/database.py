@@ -464,6 +464,33 @@ def add_message(conversation_id, role, content, model_id=None, status="completed
         connection.close()
 
 
+def save_chat_turn(conversation_id, prompt, reply, model_id):
+    """Persist a successful user/assistant pair in a single transaction."""
+    timestamp = current_time()
+    connection = get_connection()
+    try:
+        # The connection context commits both inserts together, or rolls back
+        # the entire turn if either insert or the conversation update fails.
+        with connection:
+            connection.executemany(
+                """
+                INSERT INTO messages (
+                    conversation_id, role, content, model_id, status, created_at
+                ) VALUES (?, ?, ?, ?, 'completed', ?)
+                """,
+                [
+                    (conversation_id, "user", prompt, None, timestamp),
+                    (conversation_id, "assistant", reply, model_id, timestamp),
+                ],
+            )
+            connection.execute(
+                "UPDATE conversations SET updated_at = ? WHERE id = ?",
+                (timestamp, conversation_id),
+            )
+    finally:
+        connection.close()
+
+
 def update_message_status(message_id, status):
     if status not in {"pending", "completed", "failed"}:
         raise ValueError(f"Unsupported message status: {status}")

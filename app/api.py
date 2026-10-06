@@ -1,3 +1,4 @@
+import sqlite3
 import time
 import uuid
 from pathlib import Path
@@ -8,7 +9,7 @@ from openai import OpenAI
 from pydantic import BaseModel
 
 from app.database import (
-    add_message,
+    save_chat_turn,
     create_conversation,
     get_conversation,
     get_conversations,
@@ -17,7 +18,6 @@ from app.database import (
     get_internal_benchmarks,
     get_external_benchmarks,
     summarize_internal_benchmarks,
-    update_message_status,
     initialize_database,
     update_conversation_title,
 )
@@ -96,9 +96,6 @@ def chat(request: ChatRequest):
         if message["status"] == "completed"
     ]
 
-    user_message_id = add_message(
-        request.chat_id, "user", request.prompt, status="pending"
-    )
     conversation_history.append({"role": "user", "content": request.prompt})
 
     start = time.perf_counter()
@@ -110,13 +107,16 @@ def chat(request: ChatRequest):
             selected_model,
         )
     except Exception as error:
-        update_message_status(user_message_id, "failed")
         raise HTTPException(status_code=502, detail="Agent request failed.") from error
 
     end = time.perf_counter()
 
-    update_message_status(user_message_id, "completed")
-    add_message(request.chat_id, "assistant", reply, actual_model)
+    try:
+        save_chat_turn(request.chat_id, request.prompt, reply, actual_model)
+    except sqlite3.Error as error:
+        raise HTTPException(
+            status_code=500, detail="Unable to save chat response."
+        ) from error
     
     return {
         "response": reply,
