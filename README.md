@@ -10,7 +10,7 @@ conversations across restarts.
 - Browser chat UI and interactive CLI
 - Manual model selection or benchmark-informed automatic routing
 - SQLite conversation and message persistence
-- Read, Write, and direct subprocess-based Bash tools
+- Read, Write, Delete, and direct subprocess-based Bash tools
 - Tool-call and runtime safety limits
 - Local benchmark harness with resumable JSON results
 - Internal metrics for correctness, latency, tokens, and tool calls
@@ -31,6 +31,10 @@ The browser's **Auto** option sends `auto` to this application, never to
 OpenRouter. `app/router.py` classifies the prompt as code understanding,
 debugging, feature implementation, refactoring, testing, or multi-step tool
 use. It then compares active models using data in SQLite.
+
+Non-coding requests, such as greetings, jokes, emails, or text rewriting, use
+the `general` category and `openrouter/free` directly, without benchmark
+scoring. Coding routes and their fallbacks use the three coding models above.
 
 Internal benchmark evidence emphasizes correctness (60%), followed by latency
 efficiency (15%), token efficiency (15%), and tool efficiency (10%). Public
@@ -67,7 +71,7 @@ app/
   main.py                Agent loop, CLI, and execution limits
   router.py              Prompt classifier and model scoring
   seed_benchmarks.py     Verified public benchmark import list
-  tools.py               Read, Write, and Bash implementations
+  tools.py               Read, Write, Delete, and Bash implementations
   frontend/              Browser UI
 benchmarks/fixtures/     Local benchmark tasks
 tests/                   Free, local unit tests
@@ -142,7 +146,7 @@ reruns use `--rerun=task-id:model-label`; see `app/benchmark.py` for labels.
 
 ## Current limitations
 
-- Tool use has no human approval step, and Read/Write are not sandboxed during
+- Tool use has no human approval step, and Read/Write/Delete are not sandboxed during
   normal chat. Benchmark workspaces remain path-restricted.
 - Bash starts one executable directly; shell pipelines, redirection, and other
   shell syntax are not interpreted.

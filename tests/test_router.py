@@ -12,10 +12,45 @@ from app import router
         ("Implement a new function", "feature_implementation"),
         ("Explain how this code works", "code_understanding"),
         ("Run tests and fix the problem across files", "multi_step_tool_use"),
+        ("explain this Python function", "code_understanding"),
+        ("fix this bug", "debugging"),
+        ("write pytest tests", "testing"),
+        ("update multiple files and run tests", "multi_step_tool_use"),
+        ("write code to greet Jesica", "code_understanding"),
     ],
 )
 def test_classify_task(prompt, expected):
     assert router.classify_task(prompt) == expected
+
+
+@pytest.mark.parametrize("prompt", [
+    "hello", "hi", "how are you", "what can you do", "my name is jesica",
+    "tell me a joke", "write a short paragraph", "summarize this sentence",
+    "rewrite this text", "write me a short email", "explain photosynthesis",
+    "build a good daily routine",
+])
+def test_general_prompts_bypass_benchmark_data_and_scoring(prompt, monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail("General prompts must not query or score benchmark data")
+
+    for name in ("get_models", "get_internal_benchmarks", "get_external_benchmarks"):
+        monkeypatch.setattr(router.database, name, forbidden)
+    monkeypatch.setattr(router, "_internal_scores", forbidden)
+    monkeypatch.setattr(router, "_external_scores", forbidden)
+
+    assert router.select_model(prompt) == (
+        "openrouter/free", "general", router.GENERAL_ROUTING_REASON,
+    )
+
+
+@pytest.mark.parametrize("category", router.TASK_CATEGORIES)
+def test_coding_fallback_never_uses_openrouter_free(category, monkeypatch):
+    monkeypatch.setattr(router.database, "get_models", lambda **kwargs: [])
+    monkeypatch.setattr(router.database, "get_internal_benchmarks", lambda **kwargs: [])
+    monkeypatch.setattr(router.database, "get_external_benchmarks", lambda: [])
+    selection = router.select_model_for_category(category)
+    assert selection["selected_model"] in router.SUPPORTED_MODELS
+    assert selection["evidence_type"] == "fallback"
 
 
 def test_fallback_when_benchmark_data_is_unavailable(monkeypatch):

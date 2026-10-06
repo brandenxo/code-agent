@@ -1,6 +1,7 @@
 """Deterministic prompt classification and benchmark-driven model routing."""
 
 from collections import defaultdict
+import re
 from statistics import mean
 
 from app import database
@@ -13,6 +14,7 @@ SUPPORTED_MODELS = (
 )
 
 MODEL_NAMES = {
+    "openrouter/free": "OpenRouter Free",
     "nvidia/nemotron-3-ultra-550b-a55b:free": "Nemotron 3 Ultra",
     "poolside/laguna-s-2.1:free": "Laguna S 2.1",
     "cohere/north-mini-code:free": "North Mini Code",
@@ -21,6 +23,23 @@ MODEL_NAMES = {
 TASK_CATEGORIES = (
     "code_understanding", "debugging", "feature_implementation",
     "refactoring", "testing", "multi_step_tool_use",
+)
+
+ROUTING_CATEGORIES = ("general", *TASK_CATEGORIES)
+GENERAL_ROUTING_REASON = (
+    "General conversation uses OpenRouter's free automatic model selection."
+)
+
+# Coding context keeps broad words like "explain", "build", and "support"
+# from routing ordinary conversation through coding benchmarks.
+CODING_CONTEXT = re.compile(
+    r"\b(code|coding|programming|python|javascript|typescript|java|rust|golang|"
+    r"html|css|sql|functions?|methods?|class|modules?|scripts?|repo|repository|"
+    r"codebase|api|algorithm|software|app|website|debug|debugging|bug|bugs|"
+    r"refactor|refactoring|pytest|unittest|tests?|coverage|exception|"
+    r"crash|error|failing|diagnose|"
+    r"stack\s+trace)\b|\b\w+\.(py|js|ts|tsx|jsx|java|rs|go|html|css|sql)\b",
+    re.IGNORECASE,
 )
 
 # Ordered from most specific to most general.
@@ -65,7 +84,22 @@ FALLBACK_MODELS = {
 def classify_task(prompt):
     """Classify a prompt using readable, deterministic phrase matching."""
     normalized_prompt = " ".join(prompt.lower().split())
+    has_specific_coding_action = any(
+        phrase in normalized_prompt
+        for phrase in (
+            "multiple files", "across files", "coordinated change",
+            "find and implement", "diagnose and repair", "update everywhere",
+            "add feature", "create function", "add method",
+        )
+    )
+    if not CODING_CONTEXT.search(normalized_prompt) and not has_specific_coding_action:
+        return "general"
+
     for category, phrases in CATEGORY_PHRASES:
+        # Accept intervening words in requests such as "fix this bug", while
+        # keeping the multi-step category's higher priority.
+        if category == "debugging" and re.search(r"\bfix\b.*\bbugs?\b", normalized_prompt):
+            return category
         if any(phrase in normalized_prompt for phrase in phrases):
             return category
     return "code_understanding"
@@ -160,6 +194,13 @@ def select_model(prompt):
 
 def select_model_for_category(category):
     """Use the same routing decision for chat and the comparison dashboard."""
+    if category == "general":
+        return {
+            "selected_model": "openrouter/free",
+            "display_name": MODEL_NAMES["openrouter/free"],
+            "reason": GENERAL_ROUTING_REASON,
+            "evidence_type": "general",
+        }
     if category not in TASK_CATEGORIES:
         raise ValueError(f"Unknown task category: {category}")
     try:

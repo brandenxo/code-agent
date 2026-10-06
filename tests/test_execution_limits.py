@@ -1,6 +1,8 @@
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from app.main import run_turn
 from app.tools import BASH_TIMEOUT_SECONDS, execute_tool
 
@@ -55,3 +57,32 @@ def test_normal_bash_uses_argument_list_and_timeout(monkeypatch):
     assert captured["kwargs"]["timeout"] == BASH_TIMEOUT_SECONDS
     assert "shell" not in captured["kwargs"]
     assert "Exit code: 0" in result
+
+
+def test_delete_removes_a_file(tmp_path):
+    target = tmp_path / "remove-me.txt"
+    target.write_text("temporary", encoding="utf-8")
+    tool_call = SimpleNamespace(
+        function=SimpleNamespace(
+            name="Delete", arguments=json.dumps({"file_path": str(target)})
+        )
+    )
+
+    assert execute_tool(tool_call) == "File deleted successfully."
+    assert not target.exists()
+
+
+def test_benchmark_delete_cannot_escape_workspace(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "keep-me.txt"
+    outside.write_text("important", encoding="utf-8")
+    tool_call = SimpleNamespace(
+        function=SimpleNamespace(
+            name="Delete", arguments=json.dumps({"file_path": "../keep-me.txt"})
+        )
+    )
+
+    with pytest.raises(PermissionError, match="benchmark workspace"):
+        execute_tool(tool_call, workspace_root=workspace)
+    assert outside.exists()

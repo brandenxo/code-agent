@@ -51,6 +51,23 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "Delete",
+            "description": "Delete a file",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "The path of the file to delete",
+                    }
+                },
+                "required": ["file_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "Bash",
             "description": "Execute a shell command",
             "parameters": {
@@ -147,6 +164,11 @@ def execute_tool(tool_call, workspace_root=None):
         with open(file_path, "w", encoding="utf-8") as file:
             file.write(content)
         return "File written successfully."
+
+    elif tool_call.function.name == "Delete":
+        file_path = _workspace_path(arguments["file_path"], workspace_root)
+        file_path.unlink()
+        return "File deleted successfully."
     
     elif tool_call.function.name == "Bash":
         command = arguments["command"]

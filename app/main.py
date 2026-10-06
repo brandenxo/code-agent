@@ -113,6 +113,11 @@ def run_turn(
                     f"Writing {arguments['file_path']}..."
                 )
 
+            elif tool_name == "Delete":
+                steps.append(
+                    f"Deleting {arguments['file_path']}..."
+                )
+
             elif tool_name == "Bash":
                 steps.append(
                     f"Running {arguments['command']}..."

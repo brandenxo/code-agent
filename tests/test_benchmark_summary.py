@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import api, database
-from app.router import TASK_CATEGORIES, select_model_for_category
+from app.router import ROUTING_CATEGORIES, TASK_CATEGORIES, select_model_for_category
 
 
 @pytest.fixture
@@ -48,10 +48,11 @@ def test_summary_counts_averages_external_and_routing(summary_client):
         "source": "Fixture publisher", "source_url": "https://example.test/results",
         "published_date": "2026-01-01",
     }]
-    assert set(data["routing"]) == set(TASK_CATEGORIES)
-    for category in TASK_CATEGORIES:
+    assert set(data["routing"]) == set(ROUTING_CATEGORIES)
+    for category in ROUTING_CATEGORIES:
         assert data["routing"][category] == select_model_for_category(category)
-        assert data["routing"][category]["evidence_type"] == "benchmark"
+        expected_evidence = "general" if category == "general" else "benchmark"
+        assert data["routing"][category]["evidence_type"] == expected_evidence
 
 
 def test_summary_missing_data_and_inactive_models(summary_client):
@@ -76,4 +77,6 @@ def test_summary_missing_data_and_inactive_models(summary_client):
         assert model["internal"]["avg_tool_calls"] is None
         assert set(model["categories"]) == set(TASK_CATEGORIES)
         assert model["external"] == []
-    assert all(row["evidence_type"] == "fallback" for row in data["routing"].values())
+    assert all(data["routing"][category]["evidence_type"] == "fallback"
+               for category in TASK_CATEGORIES)
+    assert data["routing"]["general"]["selected_model"] == "openrouter/free"

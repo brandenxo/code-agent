@@ -6,12 +6,14 @@ const chatList = document.getElementById("chatList");
 const modelSelect = document.getElementById("modelSelect");
 
 const modelNames = {
+    "openrouter/free": "OpenRouter Free",
     "nvidia/nemotron-3-ultra-550b-a55b:free": "Nemotron 3 Ultra",
     "poolside/laguna-s-2.1:free": "Laguna S 2.1",
     "cohere/north-mini-code:free": "North Mini Code"
 };
 
 const categoryNames = {
+    general: "General",
     code_understanding: "Code understanding",
     debugging: "Debugging",
     feature_implementation: "Feature implementation",
@@ -76,9 +78,10 @@ async function sendMessage() {
     const requestedModel = modelSelect.value;
     const existingMessages = messageCache[requestChatId] || [];
     const isFirstMessage = existingMessages.length === 0;
-    existingMessages.push({role: "user", content: prompt});
+    const userRecord = {role: "user", content: prompt, status: "pending"};
+    existingMessages.push(userRecord);
     messageCache[requestChatId] = existingMessages;
-    addMessage(storedMessageToDisplay({role: "user", content: prompt}));
+    const userMessageElement = addMessage(storedMessageToDisplay(userRecord));
     promptInput.value = "";
     setWorkingState(true);
 
@@ -108,6 +111,8 @@ async function sendMessage() {
         });
 
         loadingMessage.remove();
+        userRecord.status = "completed";
+        setMessageStatus(userMessageElement, "completed");
         const routingDetails = data.requested_model === "auto"
             ? `Auto selected: ${modelNames[data.selected_model] || data.selected_model}\nTask: ${categoryNames[data.routing_category] || data.routing_category}\nWhy: ${conciseRoutingReason(data.routing_reason)}`
             : "";
@@ -132,6 +137,8 @@ async function sendMessage() {
         refreshChats().catch((error) => console.error(error));
     } catch (error) {
         loadingMessage.remove();
+        userRecord.status = "failed";
+        setMessageStatus(userMessageElement, "failed");
         if (currentChatId === requestChatId) {
             addMessage({
                 label: "Code Agent",
@@ -229,6 +236,7 @@ function storedMessageToDisplay(message) {
         text: message.content,
         className: isUser ? "user-message" : "agent-message",
         stats: !isUser && message.model_id ? (modelNames[message.model_id] || message.model_id) : "",
+        status: isUser ? (message.status || "completed") : "completed",
         useMarkdown: !isUser
     };
 }
@@ -249,6 +257,7 @@ function addMessage({
     stats = "",
     routingDetails = "",
     routingReason = "",
+    status = "completed",
     useMarkdown = false
 }) {
     const message = document.createElement("div");
@@ -266,6 +275,9 @@ function addMessage({
     }
     message.appendChild(labelElement);
     message.appendChild(bubble);
+    if (className === "user-message") {
+        setMessageStatus(message, status);
+    }
 
     if (stats) {
         const statsElement = document.createElement("div");
@@ -284,6 +296,22 @@ function addMessage({
     messages.appendChild(message);
     messages.scrollTop = messages.scrollHeight;
     return message;
+}
+
+function setMessageStatus(message, status) {
+    message.classList.toggle("message-pending", status === "pending");
+    message.classList.toggle("message-failed", status === "failed");
+    let statusElement = message.querySelector(".message-status");
+    if (status === "completed") {
+        if (statusElement) statusElement.remove();
+        return;
+    }
+    if (!statusElement) {
+        statusElement = document.createElement("div");
+        statusElement.className = "message-status";
+        message.appendChild(statusElement);
+    }
+    statusElement.textContent = status === "failed" ? "Failed to send" : "Sending...";
 }
 
 function setWorkingState(working) {
@@ -345,8 +373,9 @@ function percent(value) {
 }
 
 function evidenceBadge(selection) {
-    return element("span", selection.evidence_type === "benchmark"
-        ? "Benchmark-driven" : "Fallback", `routing-badge ${selection.evidence_type}`);
+    const labels = {benchmark: "Benchmark-driven", fallback: "Fallback", general: "Automatic"};
+    return element("span", labels[selection.evidence_type] || selection.evidence_type,
+        `routing-badge ${selection.evidence_type}`);
 }
 
 function benchmarkTable(parent, title, headers, description = "") {
@@ -415,6 +444,7 @@ function renderBenchmarks(data, content) {
     const categories = benchmarkTable(content, "Internal category comparison",
         ["Category", ...data.models.map((model) => model.display_name), "Auto Pick"]);
     Object.entries(categoryNames).forEach(([category, label]) => {
+        if (category === "general") return;
         const row = element("tr");
         row.append(element("th", label));
         data.models.forEach((model) => {

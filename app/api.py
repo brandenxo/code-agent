@@ -17,11 +17,14 @@ from app.database import (
     get_internal_benchmarks,
     get_external_benchmarks,
     summarize_internal_benchmarks,
+    update_message_status,
     initialize_database,
     update_conversation_title,
 )
 from app.main import API_KEY, BASE_URL, run_turn
-from app.router import TASK_CATEGORIES, select_model, select_model_for_category
+from app.router import (
+    ROUTING_CATEGORIES, TASK_CATEGORIES, select_model, select_model_for_category,
+)
 
 app = FastAPI()
 
@@ -90,21 +93,29 @@ def chat(request: ChatRequest):
     conversation_history = [
         {"role": message["role"], "content": message["content"]}
         for message in stored_messages
+        if message["status"] == "completed"
     ]
 
-    add_message(request.chat_id, "user", request.prompt)
+    user_message_id = add_message(
+        request.chat_id, "user", request.prompt, status="pending"
+    )
     conversation_history.append({"role": "user", "content": request.prompt})
 
     start = time.perf_counter()
 
-    reply, actual_model, tokens, tool_count, steps = run_turn(
-        client,
-        conversation_history,
-        selected_model,
-    )
+    try:
+        reply, actual_model, tokens, tool_count, steps = run_turn(
+            client,
+            conversation_history,
+            selected_model,
+        )
+    except Exception as error:
+        update_message_status(user_message_id, "failed")
+        raise HTTPException(status_code=502, detail="Agent request failed.") from error
 
     end = time.perf_counter()
 
+    update_message_status(user_message_id, "completed")
     add_message(request.chat_id, "assistant", reply, actual_model)
     
     return {
@@ -150,7 +161,7 @@ def benchmark_summary():
         "models": models,
         "routing": {
             category: select_model_for_category(category)
-            for category in TASK_CATEGORIES
+            for category in ROUTING_CATEGORIES
         },
     }
 

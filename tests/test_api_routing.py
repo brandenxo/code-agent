@@ -7,6 +7,7 @@ def _stub_chat_storage(monkeypatch):
     monkeypatch.setattr(api, "get_conversation", lambda chat_id: {"id": chat_id})
     monkeypatch.setattr(api, "get_messages", lambda chat_id: [])
     monkeypatch.setattr(api, "add_message", lambda *args, **kwargs: None)
+    monkeypatch.setattr(api, "update_message_status", lambda *args, **kwargs: True)
 
 
 def test_chat_persistence_endpoints(tmp_path, monkeypatch):
@@ -41,6 +42,65 @@ def test_manual_model_is_passed_through(monkeypatch):
     assert result["selected_model"] == requested
     assert result["routing_category"] is None
     assert result["routing_reason"] == "Model selected manually."
+
+
+def test_general_auto_prompt_uses_openrouter_free(monkeypatch):
+    _stub_chat_storage(monkeypatch)
+    seen = {}
+
+    def fake_run_turn(client, history, model):
+        seen["model"] = model
+        return "Hello!", model, 10, 0, []
+
+    monkeypatch.setattr(api, "run_turn", fake_run_turn)
+    result = api.chat(api.ChatRequest(chat_id="chat-1", prompt="hello", model="auto"))
+    assert seen["model"] == "openrouter/free"
+    assert result["selected_model"] == "openrouter/free"
+    assert result["routing_category"] == "general"
+    assert result["routing_reason"] == (
+        "General conversation uses OpenRouter's free automatic model selection."
+    )
+
+
+def test_crashed_agent_marks_user_message_failed(tmp_path, monkeypatch):
+    monkeypatch.setattr(database, "DATABASE_PATH", tmp_path / "failed.db")
+    database.initialize_database()
+    database.create_conversation("chat-1")
+
+    def crash(*args, **kwargs):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(api, "run_turn", crash)
+    response = TestClient(api.app).post(
+        "/chat",
+        json={"chat_id": "chat-1", "prompt": "hello", "model": "auto"},
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "Agent request failed."}
+    messages = database.get_messages("chat-1")
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "hello"
+    assert messages[0]["status"] == "failed"
+
+    seen = {}
+
+    def succeed(client, history, model):
+        seen["history"] = list(history)
+        return "Recovered", model, 5, 0, []
+
+    monkeypatch.setattr(api, "run_turn", succeed)
+    recovered = TestClient(api.app).post(
+        "/chat",
+        json={"chat_id": "chat-1", "prompt": "try again", "model": "auto"},
+    )
+    assert recovered.status_code == 200
+    assert seen["history"] == [{"role": "user", "content": "try again"}]
+    messages = database.get_messages("chat-1")
+    assert [message["status"] for message in messages] == [
+        "failed", "completed", "completed"
+    ]
 
 
 def test_auto_resolves_before_run_turn(monkeypatch):

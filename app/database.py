@@ -89,11 +89,21 @@ def initialize_database():
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
                 model_id TEXT,
+                status TEXT NOT NULL DEFAULT 'completed',
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id)
             );
             """
         )
+        message_columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(messages)").fetchall()
+        }
+        if "status" not in message_columns:
+            connection.execute(
+                "ALTER TABLE messages "
+                "ADD COLUMN status TEXT NOT NULL DEFAULT 'completed'"
+            )
         connection.commit()
     finally:
         connection.close()
@@ -431,18 +441,18 @@ def update_conversation_title(conversation_id, title):
         connection.close()
 
 
-def add_message(conversation_id, role, content, model_id=None):
+def add_message(conversation_id, role, content, model_id=None, status="completed"):
     timestamp = current_time()
     connection = get_connection()
     try:
         cursor = connection.execute(
             """
             INSERT INTO messages (
-                conversation_id, role, content, model_id, created_at
+                conversation_id, role, content, model_id, status, created_at
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (conversation_id, role, content, model_id, timestamp),
+            (conversation_id, role, content, model_id, status, timestamp),
         )
         connection.execute(
             "UPDATE conversations SET updated_at = ? WHERE id = ?",
@@ -450,6 +460,21 @@ def add_message(conversation_id, role, content, model_id=None):
         )
         connection.commit()
         return cursor.lastrowid
+    finally:
+        connection.close()
+
+
+def update_message_status(message_id, status):
+    if status not in {"pending", "completed", "failed"}:
+        raise ValueError(f"Unsupported message status: {status}")
+    connection = get_connection()
+    try:
+        cursor = connection.execute(
+            "UPDATE messages SET status = ? WHERE id = ?",
+            (status, message_id),
+        )
+        connection.commit()
+        return cursor.rowcount > 0
     finally:
         connection.close()
 
