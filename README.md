@@ -36,6 +36,11 @@ Non-coding requests, such as greetings, jokes, emails, or text rewriting, use
 the `general` category and `openrouter/free` directly, without benchmark
 scoring. Coding routes and their fallbacks use the three coding models above.
 
+If an automatically selected coding model is temporarily unavailable, the
+current agent turn switches once to `openrouter/free`. The fallback continues
+from the existing tool history, so completed file or command operations are not
+repeated. General prompts and manually selected models are not retried.
+
 Internal benchmark evidence emphasizes correctness (60%), followed by latency
 efficiency (15%), token efficiency (15%), and tool efficiency (10%). Public
 benchmark scores are normalized within each benchmark before being used as a

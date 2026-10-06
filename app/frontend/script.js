@@ -32,6 +32,19 @@ function conciseRoutingReason(reason) {
     return reason;
 }
 
+function displayModelName(modelId) {
+    if (modelNames[modelId]) return modelNames[modelId];
+    const name = modelId.split("/").pop().split(":")[0];
+    return name.split("-").map((part) => {
+        if (/^\d+(\.\d+)*$/.test(part)) return part;
+        return part.charAt(0).toUpperCase() + part.slice(1);
+    }).join(" ");
+}
+
+function friendlyFallbackReason(reason, selectedModel) {
+    return reason.replace("Primary model", displayModelName(selectedModel));
+}
+
 let currentChatId = null;
 let chats = [];
 const messageCache = {};
@@ -113,16 +126,19 @@ async function sendMessage() {
         loadingMessage.remove();
         userRecord.status = "completed";
         setMessageStatus(userMessageElement, "completed");
-        const routingDetails = data.requested_model === "auto"
-            ? `Auto selected: ${modelNames[data.selected_model] || data.selected_model}\nTask: ${categoryNames[data.routing_category] || data.routing_category}\nWhy: ${conciseRoutingReason(data.routing_reason)}`
-            : "";
+        let routingDetails = "";
+        if (data.requested_model === "auto") {
+            routingDetails = data.fallback_used
+                ? `Auto selected: ${displayModelName(data.selected_model)}\nFallback: ${displayModelName(data.fallback_model)}\nWhy: ${friendlyFallbackReason(data.fallback_reason, data.selected_model)}`
+                : `Auto selected: ${displayModelName(data.selected_model)}\nTask: ${categoryNames[data.routing_category] || data.routing_category}\nWhy: ${conciseRoutingReason(data.routing_reason)}`;
+        }
         const agentMessage = {
             label: "Code Agent",
             text: data.response,
             className: "agent-message",
-            stats: `${modelNames[data.model] || data.model} \u2022 ${data.latency}s \u2022 ${data.tokens} tokens \u2022 ${data.tool_calls} tools`,
+            stats: `${displayModelName(data.model)} \u2022 ${data.latency}s \u2022 ${data.tokens} tokens \u2022 ${data.tool_calls} ${data.tool_calls === 1 ? "tool" : "tools"}`,
             routingDetails: routingDetails,
-            routingReason: data.routing_reason,
+            routingReason: [data.routing_reason, data.fallback_reason].filter(Boolean).join(" "),
             useMarkdown: true
         };
 
@@ -189,7 +205,10 @@ function createChatTitle(prompt) {
 function renderChatList() {
     chatList.innerHTML = "";
     chats.forEach((chat) => {
+        const chatEntry = document.createElement("div");
         const chatButton = document.createElement("button");
+        const deleteButton = document.createElement("button");
+        chatEntry.className = "chat-entry";
         chatButton.type = "button";
         chatButton.className = "chat-item";
         chatButton.textContent = chat.title || "New Chat";
@@ -197,8 +216,43 @@ function renderChatList() {
             chatButton.classList.add("active");
         }
         chatButton.addEventListener("click", () => switchChat(chat.id));
-        chatList.appendChild(chatButton);
+        deleteButton.type = "button";
+        deleteButton.className = "delete-chat-button";
+        deleteButton.textContent = "\u00d7";
+        deleteButton.title = `Delete ${chat.title || "New Chat"}`;
+        deleteButton.setAttribute("aria-label", deleteButton.title);
+        deleteButton.addEventListener("click", () => deleteChat(chat));
+        chatEntry.append(chatButton, deleteButton);
+        chatList.appendChild(chatEntry);
     });
+}
+
+async function deleteChat(chat) {
+    const title = chat.title || "New Chat";
+    if (!window.confirm(`Delete “${title}” and all of its messages?`)) {
+        return;
+    }
+    try {
+        await requestJson(`/chats/${encodeURIComponent(chat.id)}`, {
+            method: "DELETE"
+        });
+        delete messageCache[chat.id];
+        const deletedCurrentChat = currentChatId === chat.id;
+        chats = await requestJson("/chats");
+        if (!deletedCurrentChat) {
+            renderChatList();
+            return;
+        }
+        currentChatId = null;
+        if (chats.length > 0) {
+            await switchChat(chats[0].id);
+        } else {
+            await createChat();
+        }
+    } catch (error) {
+        console.error(error);
+        window.alert(error.message || "Unable to delete chat.");
+    }
 }
 
 async function switchChat(chatId) {

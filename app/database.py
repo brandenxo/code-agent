@@ -424,6 +424,24 @@ def get_conversations():
         connection.close()
 
 
+def delete_conversation(conversation_id):
+    """Delete a conversation and all of its messages in one transaction."""
+    connection = get_connection()
+    try:
+        with connection:
+            connection.execute(
+                "DELETE FROM messages WHERE conversation_id = ?",
+                (conversation_id,),
+            )
+            cursor = connection.execute(
+                "DELETE FROM conversations WHERE id = ?",
+                (conversation_id,),
+            )
+        return cursor.rowcount > 0
+    finally:
+        connection.close()
+
+
 def update_conversation_title(conversation_id, title):
     connection = get_connection()
     try:

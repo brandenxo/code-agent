@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from app.database import (
     save_chat_turn,
     create_conversation,
+    delete_conversation,
     get_conversation,
     get_conversations,
     get_messages,
@@ -21,7 +22,7 @@ from app.database import (
     initialize_database,
     update_conversation_title,
 )
-from app.main import API_KEY, BASE_URL, run_turn
+from app.main import API_KEY, BASE_URL, ModelFallbackError, run_turn
 from app.router import (
     ROUTING_CATEGORIES, TASK_CATEGORIES, select_model, select_model_for_category,
 )
@@ -76,6 +77,13 @@ def rename_chat(chat_id: str, request: ChatTitleRequest):
         raise HTTPException(status_code=404, detail="Chat not found")
     return {"chat_id": chat_id, "title": title[:80]}
 
+
+@app.delete("/chats/{chat_id}")
+def delete_chat(chat_id: str):
+    if not delete_conversation(chat_id):
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return {"chat_id": chat_id, "deleted": True}
+
 @app.post("/chat")
 def chat(request: ChatRequest):
     if get_conversation(request.chat_id) is None:
@@ -99,13 +107,25 @@ def chat(request: ChatRequest):
     conversation_history.append({"role": "user", "content": request.prompt})
 
     start = time.perf_counter()
+    fallback_state = {}
+    fallback_model = (
+        "openrouter/free"
+        if requested_model == "auto"
+        and routing_category != "general"
+        and selected_model != "openrouter/free"
+        else None
+    )
 
     try:
         reply, actual_model, tokens, tool_count, steps = run_turn(
             client,
             conversation_history,
             selected_model,
+            fallback_model=fallback_model,
+            fallback_state=fallback_state,
         )
+    except ModelFallbackError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(status_code=502, detail="Agent request failed.") from error
 
@@ -129,6 +149,9 @@ def chat(request: ChatRequest):
         "routing_reason": routing_reason,
         "requested_model": requested_model,
         "selected_model": selected_model,
+        "fallback_used": fallback_state.get("fallback_used", False),
+        "fallback_model": fallback_state.get("fallback_model"),
+        "fallback_reason": fallback_state.get("fallback_reason"),
     }
 
 
