@@ -1,6 +1,10 @@
 import json
+import os
+from pathlib import Path
+import re
+import shlex
 import subprocess
-
+import sys
 
 TOOLS = [
     {
@@ -61,25 +65,81 @@ TOOLS = [
 ]
 
 
-def execute_tool(tool_call):
+def _workspace_path(file_path, workspace_root):
+    path = Path(file_path)
+
+    if workspace_root is None:
+        return path
+
+    root = Path(workspace_root).resolve()
+    resolved = (root / path).resolve()
+
+    try:
+        resolved.relative_to(root)
+    except ValueError as error:
+        raise PermissionError(
+            f"Path must stay inside the benchmark workspace: {file_path}"
+        ) from error
+
+    return resolved
+
+
+def _run_benchmark_command(command, workspace_root):
+    allowed = re.fullmatch(
+        r"(?:python|py)(?:\.exe)?\s+-m\s+(?:pytest|unittest)"
+        r"[A-Za-z0-9_./\\:\s=-]*",
+        command.strip(),
+        flags=re.IGNORECASE,
+    )
+
+    if not allowed:
+        return (
+            "Exit code: 126\nSTDOUT:\n\nSTDERR:\n"
+            "Benchmark Bash only permits python -m pytest or "
+            "python -m unittest commands."
+        )
+
+    arguments = shlex.split(command, posix=os.name != "nt")
+    arguments[0] = sys.executable
+
+    result = subprocess.run(
+        arguments,
+        cwd=workspace_root,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    return (
+        f"Exit code: {result.returncode}\n"
+        f"STDOUT:\n{result.stdout}\n"
+        f"STDERR:\n{result.stderr}"
+    )
+
+
+def execute_tool(tool_call, workspace_root=None):
     arguments = json.loads(tool_call.function.arguments)
 
     if tool_call.function.name == "Read":
-        file_path = arguments["file_path"]
+        file_path = _workspace_path(arguments["file_path"], workspace_root)
 
-        with open(file_path, "r") as file:
+        with open(file_path, "r", encoding="utf-8") as file:
             return file.read()
         
     elif tool_call.function.name == "Write":
-        file_path = arguments["file_path"]
+        file_path = _workspace_path(arguments["file_path"], workspace_root)
         content = arguments["content"]
 
-        with open(file_path, "w") as file:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(file_path, "w", encoding="utf-8") as file:
             file.write(content)
         return "File written successfully."
     
     elif tool_call.function.name == "Bash":
         command = arguments["command"]
+
+        if workspace_root is not None:
+            return _run_benchmark_command(command, workspace_root)
 
         result = subprocess.run(
             command,

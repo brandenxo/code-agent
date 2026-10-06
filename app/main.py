@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 
 from app.tools import TOOLS, execute_tool
 from openai import OpenAI
@@ -15,11 +16,12 @@ MODEL = os.getenv(
 )
 
 
-def run_turn(client, conversation_history):
+def run_turn(client, conversation_history, model, workspace_root=None):
     total_tokens, tool_count = 0, 0
+    steps = []
     while True:
         chat = client.chat.completions.create(
-            model=MODEL,
+            model=model,
             messages=conversation_history,
             tools=TOOLS,
         )
@@ -38,11 +40,33 @@ def run_turn(client, conversation_history):
                 message.content or "",
                 chat.model,
                 total_tokens,
-                tool_count
+                tool_count,
+                steps,
                 )
 
         for tool_call in message.tool_calls:
-            result = execute_tool(tool_call)
+            arguments = json.loads(tool_call.function.arguments)
+            tool_name = tool_call.function.name
+
+            if tool_name == "Read":
+                steps.append(
+                    f"Reading {arguments['file_path']}..."
+                )
+
+            elif tool_name == "Write":
+                steps.append(
+                    f"Writing {arguments['file_path']}..."
+                )
+
+            elif tool_name == "Bash":
+                steps.append(
+                    f"Running {arguments['command']}..."
+                )
+
+            try:
+                result = execute_tool(tool_call, workspace_root=workspace_root)
+            except (OSError, PermissionError, ValueError) as error:
+                result = f"Tool error: {error}"
 
             conversation_history.append(
                 {
@@ -51,6 +75,7 @@ def run_turn(client, conversation_history):
                     "content": result,
                 }
             )
+
             tool_count += 1
 
 
@@ -70,7 +95,7 @@ def run_agent(prompt):
         }
     ]
 
-    return run_turn(client, conversation_history)
+    return run_turn(client, conversation_history, MODEL)
 
 
 def main():
@@ -100,9 +125,10 @@ def main():
             }
         )
 
-        reply, model, tokens = run_turn(
+        reply, model, tokens, tool_count, steps = run_turn(
             client,
             conversation_history,
+            MODEL,
         )
 
         sys.stdout.write(reply + "\n")
